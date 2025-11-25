@@ -13,17 +13,64 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 app = FastAPI()
 
+# Функция для отправки текущих скидок пользователю
+async def send_current_deals(user_id):
+    try:
+        # Получаем текущие скидки Steam
+        steam_deals = get_steam_deals()
+        if steam_deals:
+            await bot.send_message(user_id, "🔥 **Текущие скидки Steam:**")
+            for deal in steam_deals[:3]:  # Первые 3 скидки
+                text = f"🎮 {deal['title']}\n💰 {deal['original_price']} → {deal['final_price']} ({deal['discount']}%)\n🔗 {deal['url']}"
+                await bot.send_message(user_id, text)
+        
+        # Получаем текущие бесплатные игры Epic
+        epic_deals = get_epic_free_games()
+        if epic_deals:
+            await bot.send_message(user_id, "🎁 **Текущие бесплатные игры Epic:**")
+            for deal in epic_deals[:3]:  # Первые 3 игры
+                text = f"🎮 {deal['title']}\n🔗 {deal['url']}"
+                await bot.send_message(user_id, text)
+                
+        if not steam_deals and not epic_deals:
+            await bot.send_message(user_id, "На данный момент нет актуальных скидок.")
+            
+    except Exception as e:
+        print(f"Error sending current deals: {e}")
+        await bot.send_message(user_id, "Произошла ошибка при получении скидок.")
+
 # Хэндлеры
 @dp.message(Command("start"))
 async def start(message: types.Message):
-    add_user(message.from_user.id)
+    user_id = message.from_user.id
+    add_user(user_id)
+    
     await message.answer("Привет! Ты подписан на скидки Steam и бесплатные игры Epic.")
+    await asyncio.sleep(1)
+    await message.answer("Загружаю текущие скидки...")
+    
+    # Отправляем текущие скидки сразу после старта
+    await send_current_deals(user_id)
 
 @dp.message(Command("help"))
 async def help_command(message: types.Message):
-    await message.answer("/start - подписаться\n/help - помощь")
+    help_text = """
+🤖 **Команды бота:**
+/start - подписаться и получить текущие скидки
+/help - показать это сообщение
+/deals - получить текущие скидки (ручной запрос)
 
-# Функция для рассылки
+Бот автоматически присылает новые скидки каждые 30 минут!
+    """
+    await message.answer(help_text)
+
+@dp.message(Command("deals"))
+async def deals_command(message: types.Message):
+    """Ручной запрос текущих скидок"""
+    await message.answer("Загружаю текущие скидки...")
+    await send_current_deals(message.from_user.id)
+
+# Функция для автоматической рассылки (фоновая)
 async def send_deals():
     while True:
         try:
@@ -34,7 +81,7 @@ async def send_deals():
             for deal in steam_deals:
                 if is_new_deal("steam_" + deal["id"]):
                     for user in users:
-                        text = f"🔥 Steam Deal: {deal['title']}\n💰 {deal['original_price']} → {deal['final_price']} ({deal['discount']}%)\n🔗 {deal['url']}"
+                        text = f"🔥 **Новая скидка Steam!**\n🎮 {deal['title']}\n💰 {deal['original_price']} → {deal['final_price']} ({deal['discount']}%)\n🔗 {deal['url']}"
                         await bot.send_message(user, text)
                     save_deal("steam_" + deal["id"])
             
@@ -43,14 +90,14 @@ async def send_deals():
             for deal in epic_deals:
                 if is_new_deal("epic_" + deal["id"]):
                     for user in users:
-                        text = f"🎁 Free Epic Game: {deal['title']}\n🔗 {deal['url']}"
+                        text = f"🎁 **Новая бесплатная игра Epic!**\n🎮 {deal['title']}\n🔗 {deal['url']}"
                         await bot.send_message(user, text)
                     save_deal("epic_" + deal["id"])
-            
-            await asyncio.sleep(min(CHECK_INTERVAL_STEAM, CHECK_INTERVAL_EPIC))
+        
         except Exception as e:
             print(f"Error in send_deals: {e}")
-            await asyncio.sleep(60)
+        
+        await asyncio.sleep(min(CHECK_INTERVAL_STEAM, CHECK_INTERVAL_EPIC))
 
 # FastAPI роуты
 @app.get("/")
@@ -61,7 +108,7 @@ def root():
 def health():
     return {"status": "healthy"}
 
-# Запуск бота без многопоточности
+# Запуск бота
 async def start_bot():
     print("Starting Telegram bot polling...")
     # Запускаем рассылку в фоне
