@@ -1,6 +1,6 @@
-aiogram==3.1.0
+aiogram==3.1.1  # или новее
 aiohttp==3.8.5
 aiofiles==23.1.0
-pydantic==2.12.4
+pydantic==2.10.9  # версия совместимая с typing-extensions 4.7.1
 requests==2.32.5
 magic-filter==1.0.12
