@@ -240,7 +240,7 @@ def root():
 def health():
     return {"status": "healthy"}
 
-# Запуск бота в отдельном потоке чтобы избежать конфликта с FastAPI
+# Запуск бота
 async def start_bot():
     print("Starting Telegram bot polling...")
     # Запускаем рассылку в фоне
@@ -251,14 +251,19 @@ async def start_bot():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     
-    # Запускаем только FastAPI для Render
-    # Бот будет запускаться только если это не Render
-    if not os.environ.get('RENDER'):
-        # Локальный запуск с ботом
-        async def main():
-            await start_bot()
-        asyncio.run(main())
-    else:
-        # На Render запускаем только FastAPI
-        print("Running on Render - starting FastAPI only...")
-        uvicorn.run(app, host="0.0.0.0", port=port)
+    # Всегда запускаем и бота, и FastAPI вместе
+    async def main():
+        print("Starting both FastAPI and Telegram bot...")
+        
+        # Запускаем бота в фоне
+        bot_task = asyncio.create_task(start_bot())
+        
+        # Запускаем FastAPI сервер
+        config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="info")
+        server = uvicorn.Server(config)
+        
+        # Запускаем обе задачи
+        await asyncio.gather(server.serve(), bot_task)
+    
+    # Запускаем всё
+    asyncio.run(main())
