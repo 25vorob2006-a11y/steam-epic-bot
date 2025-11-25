@@ -204,10 +204,17 @@ async def send_deals():
 async def main():
     print("🚀 Starting Telegram Bot...")
     init_db()
-    await bot.delete_webhook(drop_pending_updates=True)
+    
+    # ПРИНУДИТЕЛЬНО удаляем вебхук
+    try:
+        await bot.delete_webhook(drop_pending_updates=True)
+        print("✅ Webhook deleted successfully")
+    except Exception as e:
+        print(f"❌ Error deleting webhook: {e}")
+        # Пробуем еще раз
+        import requests
+        requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook")
+    
     asyncio.create_task(send_deals())
     print("🤖 Bot is running...")
     await dp.start_polling(bot)
-
-if __name__ == "__main__":
-    asyncio.run(main())
