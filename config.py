@@ -1,0 +1,6 @@
+import os
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHECK_INTERVAL_STEAM = int(os.getenv("CHECK_INTERVAL_STEAM", 3600))
+CHECK_INTERVAL_EPIC = int(os.getenv("CHECK_INTERVAL_EPIC", 43200))
+
