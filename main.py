@@ -61,31 +61,27 @@ def root():
 def health():
     return {"status": "healthy"}
 
-# Запуск бота
+# Запуск бота без многопоточности
 async def start_bot():
-    print("Starting Telegram bot...")
+    print("Starting Telegram bot polling...")
+    # Запускаем рассылку в фоне
     asyncio.create_task(send_deals())
+    # Запускаем polling
     await dp.start_polling(bot)
 
-# Запуск всего приложения
-async def main():
-    await asyncio.gather(
-        start_bot(),
-        asyncio.sleep(0)  # dummy task to keep gather working
-    )
-
 if __name__ == "__main__":
-    # Запускаем FastAPI сервер
     port = int(os.environ.get("PORT", 10000))
     
-    # В отдельном потоке запускаем бота
-    import threading
-    def run_bot():
-        asyncio.run(main())
+    # Запускаем и бота, и веб-сервер в одном event loop
+    async def main():
+        # Создаем задачу для бота
+        bot_task = asyncio.create_task(start_bot())
+        # Запускаем веб-сервер
+        config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="info")
+        server = uvicorn.Server(config)
+        
+        # Запускаем обе задачи
+        await asyncio.gather(server.serve(), bot_task)
     
-    bot_thread = threading.Thread(target=run_bot)
-    bot_thread.daemon = True
-    bot_thread.start()
-    
-    # Запускаем FastAPI
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    # Запускаем всё
+    asyncio.run(main())
