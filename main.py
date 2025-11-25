@@ -1,4 +1,7 @@
 import asyncio
+import os
+from fastapi import FastAPI
+import uvicorn
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from config import BOT_TOKEN, CHECK_INTERVAL_STEAM, CHECK_INTERVAL_EPIC
@@ -7,7 +10,7 @@ from epic_parser import get_epic_free_games
 from database import add_user, get_users, save_deal, is_new_deal
 
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()  # без аргументов
+dp = Dispatcher()
 
 # Хэндлеры
 @dp.message(Command("start"))
@@ -44,10 +47,21 @@ async def send_deals():
         
         await asyncio.sleep(min(CHECK_INTERVAL_STEAM, CHECK_INTERVAL_EPIC))
 
-# Основная функция
+# FastAPI для Render
+app = FastAPI()
+
+@app.get("/")
+def root():
+    return {"status": "running"}
+
 async def main():
     asyncio.create_task(send_deals())
-    await dp.start_polling(bot)  # bot передаём здесь
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # запускаем веб-сервер и Telegram-бота параллельно
+    port = int(os.environ.get("PORT", 8000))
+    asyncio.run(asyncio.gather(
+        main(),
+        uvicorn.run(app, host="0.0.0.0", port=port)
+    ))
